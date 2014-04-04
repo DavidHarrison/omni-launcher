@@ -1,0 +1,118 @@
+#!/usr/bin/bash
+
+#CONF_FILE=$HOME/.config/omni.conf
+SEARCH_ENGINE_FILE="$HOME/.config/dwb/searchengines"
+SEARCH_ENGINE_BREAK='_dwb_search_submit_'
+URL_SCHEMES='http:// https:// ftp://'
+XTERMINAL='urxvtc'
+DEFAULT_URL_SCHEME='http://'
+
+function getArguments
+{
+	arguments=
+	for i in ${@:2}
+	do
+		arguments=$arguments' '$i
+	done
+	echo $arguments
+}
+
+function htmlEncode
+{
+	encoded=$1
+	for i in ${@:2}
+	do
+		encoded=$encoded"%20"$i
+	done
+	echo $encoded
+}
+
+function addrsSegOne
+{
+	echo `echo "$1" | awk -F "$SEARCH_ENGINE_BREAK" '{print $1}'`
+}
+
+function addrsSegTwo
+{
+	echo `echo "$1" | awk -F "$SEARCH_ENGINE_BREAK" '{print $2}'`
+}
+
+function searchEngineResolve
+{
+	search_key_line=`cat "$SEARCH_ENGINE_FILE" | grep "^$1 "`
+	if [ "$search_key_line"  != '' ]
+	then
+		address=`addrsSegOne ${search_key_line:2}``htmlEncode ${@:2}``addrsSegTwo ${search_key_line:2}`
+		exec xdg-open $address
+		echo 'true'
+	else
+		echo 'false'
+	fi
+}
+
+function urlResolve
+{
+	for i in $URL_SCHEMES
+	do
+		case "$1"
+		in $i*)
+			xdg-open $1
+			echo 'true'
+			exit
+			;;
+		esac
+	done
+	if [[ $1 = *'.'* ]] || [[ $1 = *':'* ]]
+	then
+		xdg-open "$DEFAULT_URL_SCHEME"$1
+		echo 'true'
+	else
+		echo 'false'
+	fi
+}
+
+function resolve
+{
+	# open in new terminal
+	if [ "$1" == 'X' ]
+	then
+		command=${@:2}
+		if [ "$command" != '' ]
+		then
+			exec $XTERMINAL -e "$SHELL" -c "$command && $SHELL"
+		else
+			exec $XTERMINAL
+		fi
+	# execute command
+	elif [ "$1" == 'x' ]
+	then
+		exec ${@:2}
+	# use search engine
+	elif [ "`searchEngineResolve $@`" == 'false' ]
+	then
+		# open file
+		eval evaluated=$@
+		evaluated=`readlink -f $evaluated`
+		if [ ${#evaluated} -ne 0 ] && [ -e "$evaluated" ]
+		then
+			exec xdg-open "$evaluated"
+		# open url
+		elif [ "`urlResolve $@`" == "false" ]
+		then
+			exit 1
+		fi
+	else
+		exit 1
+	fi
+}
+
+if [ ${#@} -ne 0 ]
+then
+	resolve $@
+else
+	read arguments
+	if [ ${#arguments} -ne 0 ]
+	then
+		resolve $arguments
+	fi
+fi

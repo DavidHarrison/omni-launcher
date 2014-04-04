@@ -1,0 +1,4 @@
+#!/bin/sh
+#Use of xft font causes dmenu wait until the next character to show spaces
+FONT='Source Code Pro Light:size=10'
+cat /dev/null | dmenu -fn "$FONT" -p 'Do:' | ~/.bin/omni
